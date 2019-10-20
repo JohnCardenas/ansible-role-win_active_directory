@@ -1,0 +1,148 @@
+---
+- name: "Check Required Variables"
+  fail: msg="{{ item }} is not defined"
+  when: item is undefined
+  loop:
+    - win_active_directory.domain_name
+    - win_active_directory.domain_admin_password
+    - win_active_directory.domain_admin_user
+
+- name: Configure Sites
+  win_dsc:
+    resource_name: ADReplicationSite
+    Ensure: "{{ item.ensure | default('present') }}"
+    Name: "{{ item.name }}"
+    PsDscRunAsCredential_password: "{{ win_active_directory.domain_admin_password }}"
+    PsDscRunAsCredential_username: "{{ win_active_directory.domain_admin_user }}"
+    RenameDefaultFirstSiteName: "{{ item.rename_default_site | default('false') }}"
+  with_items:
+    - "{{ win_active_directory.sites | default([]) }}"
+
+- name: Configure Subnets
+  win_dsc:
+    resource_name: ADReplicationSubnet
+    Ensure: "{{ item.ensure | default('present') }}"
+    Name: "{{ item.name }}"
+    PsDscRunAsCredential_password: "{{ win_active_directory.domain_admin_password }}"
+    PsDscRunAsCredential_username: "{{ win_active_directory.domain_admin_user }}"
+    Site: "{{ item.site }}"
+  with_items:
+    - "{{ win_active_directory.subnets | default([]) }}"
+
+- name: Configure Organizational Units
+  win_dsc:
+    resource_name: ADOrganizationalUnit
+    Ensure: "{{ item.ensure | default('present') }}"
+    Name: "{{ item.name }}"
+    Path: "{{ item.path }}"
+    ProtectedFromAccidentalDeletion: "{{ item.protected_from_accidental_deletion | default('true') }}"
+    PsDscRunAsCredential_password: "{{ win_active_directory.domain_admin_password }}"
+    PsDscRunAsCredential_username: "{{ win_active_directory.domain_admin_user }}"
+  with_items:
+    - "{{ win_active_directory.org_units | default([]) }}"
+
+- name: Configure Default Computers OU
+  block:
+    - name: Lookup Default Computers OU
+      win_command: "powershell.exe (Get-ADDomain {{win_active_directory.domain_name}}).ComputersContainer"
+      register: lookup_default_computers_ou
+      changed_when: false
+
+    - name: Parse Default Computers OU
+      set_fact:
+        lookup_default_computers_ou: "{{lookup_default_computers_ou.stdout | trim}}"
+
+    - name: Set Default Computers OU
+      win_command: redircmp "{{win_active_directory.default_computers_ou}}"
+      when: lookup_default_computers_ou != win_active_directory.default_computers_ou
+  when: win_active_directory.default_computers_ou is defined
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ win_active_directory.domain_admin_user }}"
+    ansible_become_pass: "{{ win_active_directory.domain_admin_password }}"
+  
+- name: Configure Default Users OU
+  block:
+    - name: Lookup Default Users OU
+      win_command: "powershell.exe (Get-ADDomain {{win_active_directory.domain_name}}).UsersContainer"
+      register: lookup_default_users_ou
+      changed_when: false
+
+    - name: Parse Default Users OU
+      set_fact:
+        lookup_default_users_ou: "{{lookup_default_users_ou.stdout | trim}}"
+
+    - name: Set Default Users OU
+      win_command: redirusr "{{win_active_directory.default_users_ou}}"
+      when: lookup_default_users_ou != win_active_directory.default_users_ou
+  when: win_active_directory.default_users_ou is defined
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ win_active_directory.domain_admin_user }}"
+    ansible_become_pass: "{{ win_active_directory.domain_admin_password }}"
+
+- name: Configure Groups
+  win_domain_group:
+    domain_username: "{{ win_active_directory.domain_admin_user }}"
+    domain_password: "{{ win_active_directory.domain_admin_password }}"
+    name: "{{ item.name }}"
+    path: "{{ item.path }}"
+    scope: "{{ item.scope | default('global') }}"
+    state: "{{ item.ensure | default('present') }}"
+  with_items:
+    - "{{ win_active_directory.groups | default([]) }}"
+
+- name: Configure Users
+  win_domain_user:
+    attributes: "{{ item.attributes | default({}) }}"
+    description: "{{ item.description | default('') }}"
+    domain_username: "{{ win_active_directory.domain_admin_user }}"
+    domain_password: "{{ win_active_directory.domain_admin_password }}"
+    enabled: "{{ item.enabled | default('yes') }}"
+    groups: "{{ item.groups | default(win_active_directory_default_user_groups) }}"
+    groups_action: "{{ item.groups_action | default('replace') }}"
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    password_never_expires: "{{ item.password_never_expires | default('yes') }}"
+    path: "{{ item.path }}"
+    state: "{{ item.ensure | default('present') }}"
+    update_password: "{{ item.update_password | default('on_create') }}"
+    upn: "{{ item.upn }}"
+    user_cannot_change_password: "{{ item.user_cannot_change_password | default('yes') }}"
+  no_log: true
+  with_items:
+    - "{{ win_active_directory.users | default([]) }}"
+
+- name: Configure Security
+  win_dsc:
+    resource_name: ADObjectPermissionEntry
+    AccessControlType: "{{ item.access_control_type }}"
+    ActiveDirectoryRights: "{{ item.rights }}"
+    ActiveDirectorySecurityInheritance: "{{ item.security_inheritance | default('None') }}"
+    Ensure: "{{ item.ensure | default('present') }}"
+    IdentityReference: "{{ item.identity }}"
+    InheritedObjectType: "{{ item.inherited_object_type | default('00000000-0000-0000-0000-000000000000') }}"
+    ObjectType: "{{ item.object_type | default('00000000-0000-0000-0000-000000000000') }}"
+    Path: "{{ item.path }}"
+    PsDscRunAsCredential_password: "{{ win_active_directory.domain_admin_password }}"
+    PsDscRunAsCredential_username: "{{ win_active_directory.domain_admin_user }}"
+  with_items:
+    - "{{ win_active_directory.security | default([]) }}"
+
+- name: Configure Trusts
+  win_dsc:
+    resource_name: ADDomainTrust
+    Ensure: "{{ item.ensure | default('present') }}"
+    PsDscRunAsCredential_password: "{{ win_active_directory.domain_admin_password }}"
+    PsDscRunAsCredential_username: "{{ win_active_directory.domain_admin_user }}"
+    SourceDomainName: "{{ item.source_domain_name }}"
+    TargetCredential_username: "{{ item.target_domain_enterprise_admin_user }}"
+    TargetCredential_password: "{{ item.target_domain_enterprise_admin_password }}"
+    TrustDirection: "{{ item.direction }}"
+    TargetDomainName: "{{ item.target_domain_name }}"
+    TrustType: "{{ item.type | default('External') }}"
+  no_log: true
+  with_items:
+    - "{{ win_active_directory.trusts | default([]) }}"

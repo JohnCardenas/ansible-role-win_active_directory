@@ -1,0 +1,30 @@
+---
+# tasks file for win_active_directory
+- import_tasks: win_active_directory-check.yml
+  tags:
+    - check
+    - win_active_directory
+    - win_active_directory:check
+    - win_active_directory:install
+    - win_active_directory:promote
+    - win_active_directory:configure
+
+- import_tasks: win_active_directory-install.yml
+  tags:
+    - install
+    - win_active_directory
+    - win_active_directory:install
+
+- import_tasks: win_active_directory-promote.yml
+  tags:
+    - promote
+    - win_active_directory
+    - win_active_directory:promote
+
+- import_tasks: win_active_directory-configure.yml
+  run_once: true
+  #when: ansible_facts['windows_domain_role'].find("Primary") != -1
+  tags:
+    - configure
+    - win_active_directory
+    - win_active_directory:configure

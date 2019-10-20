@@ -1,0 +1,4 @@
+---
+# vars file for win_active_directory
+win_active_directory_default_user_groups:
+  - Domain Users

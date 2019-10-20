@@ -1,0 +1,25 @@
+---
+- name: "Check Required Variables"
+  fail: msg="{{ item }} is not defined"
+  when: item is undefined
+  loop:
+    - win_active_directory.domain_name
+    - win_active_directory.domain_admin_password
+    - win_active_directory.domain_admin_user
+    - win_active_directory.safe_mode_password
+
+- name: Promote Domain Controller
+  win_domain_controller:
+      dns_domain_name: "{{win_active_directory.domain_name}}"
+      domain_admin_user: "{{win_active_directory.domain_admin_user}}"
+      domain_admin_password: '{{win_active_directory.domain_admin_password}}'
+      safe_mode_password: '{{win_active_directory.safe_mode_password}}'
+      state: domain_controller
+  register: domain_state
+
+- name: Reboot Domain Controller
+  win_reboot:
+    msg: "Rebooting for Domain Controller Promotion"
+    pre_reboot_delay: 15
+    reboot_timeout: 3600
+  when: domain_state.changed

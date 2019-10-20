@@ -1,0 +1,22 @@
+---
+- name: Install AD Services
+  win_feature: >
+    name=AD-Domain-Services
+    include_management_tools=yes
+    include_sub_features=yes
+    state=present
+
+- name: Install PowerShell DSC Feature
+  win_feature: >
+    name=DSC-Service
+    state=present
+
+- name: Deploy ActiveDirectoryDsc PS Module
+  win_psmodule:
+    name: ActiveDirectoryDsc
+    state: present
+
+- name: Deploy xDnsServer PS Module
+  win_psmodule:
+    name: xDnsServer
+    state: present

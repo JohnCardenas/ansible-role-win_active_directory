@@ -1,0 +1,4 @@
+---
+- fail:
+    msg: "The win_active_directory role can only be deployed on Windows."
+  when: ansible_facts['os_family'] != "Windows"

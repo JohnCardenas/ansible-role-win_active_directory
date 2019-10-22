@@ -111,7 +111,6 @@
     update_password: "{{ item.update_password | default('on_create') }}"
     upn: "{{ item.upn }}"
     user_cannot_change_password: "{{ item.user_cannot_change_password | default('yes') }}"
-  no_log: true
   with_items:
     - "{{ win_active_directory.users | default([]) }}"
 
@@ -143,6 +142,5 @@
     TrustDirection: "{{ item.direction }}"
     TargetDomainName: "{{ item.target_domain_name }}"
     TrustType: "{{ item.type | default('External') }}"
-  no_log: true
   with_items:
     - "{{ win_active_directory.trusts | default([]) }}"
